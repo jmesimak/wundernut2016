@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import './App.css';
 import * as pngjs from 'pngjs';
-
+import Dropzone from 'react-dropzone';
 
 class App extends Component {
   constructor() {
@@ -70,6 +70,7 @@ class App extends Component {
           switch (instruction) {
             case 'go-up': this._goUp(pixelIdx, rowIdx, imageMatrix); break;
             case 'go-left': this._goLeft(pixelIdx, rowIdx, imageMatrix); break;
+            default: break;
           }              
         }
       }
@@ -84,6 +85,7 @@ class App extends Component {
     switch (this.directions[pixel.join(' ')]) {
       case 'turn-right': right(x, y, imageMatrix); break;
       case 'turn-left': left(x, y, imageMatrix); break;
+      default: break;
     }
   }
 
@@ -144,7 +146,7 @@ class App extends Component {
     }
 
     /* Ugly hack because this has taken enough time already */
-    document.getElementById('img-input').remove()
+    document.getElementById('dropzone').remove()
     let line = document.createElement('pre')
     line.appendChild(document.createTextNode(answ))
     document.getElementById('answ').appendChild(line)
@@ -156,14 +158,15 @@ class App extends Component {
     });
   }
 
-  handleFile(fileChooseEvent) {
-    let file = fileChooseEvent.target.files[0]
+  handleFile(acceptedFiles, rejectedFiles) {
+    console.log(acceptedFiles)
+    let file = acceptedFiles[0]
     let fr = new FileReader()
 
     fr.onload = (fileReadEvent) => {
       let bytes = new Uint8Array(fileReadEvent.target.result)
       let PNG = pngjs.PNG
-      let pngHandler = new PNG().parse(bytes, (err, parseResult) => {
+      new PNG().parse(bytes, (err, parseResult) => {
         this.bounds.x = parseResult.width
         this.bounds.y = parseResult.height
         const rgbCodes = parseResult.data
@@ -181,11 +184,23 @@ class App extends Component {
   }
 
   render() {
+    const dropStyle = {
+      margin: '0 auto',
+      border: '1px solid grey',
+      width: '25em',
+      height: '25em',
+      padding: '2em',
+      backgroundColor: '#a8a8a8',
+      color: 'white'
+    }
+
     return (
       <div className="App">
-        <h1>Wundernut 2016 decrypter</h1>
-        <br />
-        <input type="file" id="img-input" onChange={this.handleFile.bind(this)} />
+        <h1>Wunder🥜 2016 decrypter</h1>
+        <Dropzone onDrop={this.handleFile.bind(this)} id="dropzone" style={dropStyle}>
+          <h2>Drop the image here and I guarantee you'll be amazed! <br/> (p.s. no error checking)</h2>
+        </Dropzone>
+        
         <div id="answ"></div>
       </div>
     );
