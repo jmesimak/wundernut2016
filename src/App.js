@@ -148,6 +148,7 @@ class App extends Component {
     /* Ugly hack because this has taken enough time already */
     document.getElementById('dropzone').remove()
     let line = document.createElement('pre')
+    line.setAttribute('class', 'animated fadeIn')
     line.appendChild(document.createTextNode(answ))
     document.getElementById('answ').appendChild(line)
   }
