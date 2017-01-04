@@ -7,17 +7,17 @@ const directions = {
   '51 69 169': 'stop',
   '182 149 72': 'turn-right',
   '123 131 154': 'turn-left'
-};
+}
 
-var bounds = {};
-var canvas = [];
+var bounds = {}
+var canvas = []
 
 function createPixels(rgbCodes) {
-    let pixels = [];
+    let pixels = []
     for (var i = 0; i < rgbCodes.length; i += 4) {
-      pixels.push([rgbCodes[i], rgbCodes[i+1], rgbCodes[i+2]]);
+      pixels.push([rgbCodes[i], rgbCodes[i+1], rgbCodes[i+2]])
     }
-    return pixels;
+    return pixels
 }
 
 function convertPixelsToImageMatrix(pixels, width, height) {
@@ -29,7 +29,7 @@ function convertPixelsToImageMatrix(pixels, width, height) {
       let curPix = pixels[j + pad]
       row.push(curPix)
     }
-    imageMatrix.push(row);
+    imageMatrix.push(row)
   } 
   return imageMatrix
 }
@@ -38,7 +38,7 @@ function initCanvas(width, height) {
   for (var i = 0; i < height; i++) {
     var row = []
     for (var j = 0; j < width; j++) {
-      row.push([255, 255, 255]);
+      row.push([255, 255, 255])
     }
     canvas.push(row)
   }
@@ -46,10 +46,10 @@ function initCanvas(width, height) {
 
 function drawByControlpixels(imageMatrix) {
   for (var rowIdx = 0; rowIdx < imageMatrix.length; rowIdx++) {
-    let row = imageMatrix[rowIdx];
+    let row = imageMatrix[rowIdx]
     for (var pixelIdx = 0; pixelIdx < row.length; pixelIdx++) {
-      let pixel = row[pixelIdx];
-      let instruction = directions[pixel.join(' ')];
+      let pixel = row[pixelIdx]
+      let instruction = directions[pixel.join(' ')]
       if (instruction) {
         switch (instruction) {
           case 'go-up': goUp(pixelIdx, rowIdx, imageMatrix); break;
@@ -92,56 +92,48 @@ function printMtx(m) {
 }
 
 function listInstructions(mtx) {
-  let pxls = [];
+  let pxls = []
   for (var i = 0; i < mtx.length; i++) {
     for (var j = 0; j < mtx[i].length; j++) {
-      let dir = directions[mtx[i][j].join(' ')];
-      if (dir) pxls.push([i, j]);
+      let dir = directions[mtx[i][j].join(' ')]
+      if (dir) pxls.push([i, j])
     }
   }
-  return pxls;
+  return pxls
 }
 
 function paintHere(pixel) {
   const pStr = directions[pixel.join(' ')]
-  return !pStr;
+  return !pStr
+}
+
+function directionChange(pixel, x, y, left, right, imageMatrix) {
+  switch (directions[pixel.join(' ')]) {
+    case 'turn-right': right(x, y, imageMatrix); break;
+    case 'turn-left': left(x, y, imageMatrix); break;
+  }
 }
 
 function goUp(x, y, imageMatrix) {
   y -= 1
   let pixel = imageMatrix[y][x]
-
   while (paintHere(pixel) && y > 0) {
     canvas[y][x] = [0,0,0]
-    y -= 1;
+    y -= 1
     pixel = imageMatrix[y][x]
   }
-
-  let instruction = directions[pixel.join(' ')];
-  if (instruction === 'turn-right') {
-    goRight(x, y, imageMatrix);
-  } else if (instruction === 'turn-left') {
-    goLeft(x, y, imageMatrix);
-  }
+  directionChange(pixel, x, y, goLeft, goRight, imageMatrix)
 }
 
 function goLeft(x, y, imageMatrix) {
   x -= 1
   let pixel = imageMatrix[y][x]
-  
   while (paintHere(pixel) && x > 0) {
     canvas[y][x] = [0,0,0]
     x -= 1;
     pixel = imageMatrix[y][x]
   }
-
-  let instruction = directions[pixel.join(' ')];
-  if (instruction === 'turn-right') {
-    goUp(x, y, imageMatrix);
-  }
-  else if (instruction === 'turn-left') {
-    goDown(x, y, imageMatrix);
-  }
+  directionChange(pixel, x, y, goDown, goUp, imageMatrix)
 }
 
 function goRight(x, y, imageMatrix) {
@@ -149,17 +141,10 @@ function goRight(x, y, imageMatrix) {
   let pixel = imageMatrix[y][x]
   while (paintHere(pixel) && x <= bounds.width) {
     canvas[y][x] = [0,0,0]
-    x += 1;
+    x += 1
     pixel = imageMatrix[y][x]
   }
-
-  let instruction = directions[pixel.join(' ')];
-  if (instruction === 'turn-right') {
-    goDown(x, y, imageMatrix);
-  }
-  else if (instruction === 'turn-left') {
-    goUp(x, y, imageMatrix);
-  }
+  directionChange(pixel, x, y, goUp, goDown, imageMatrix)
 }
 
 function goDown(x, y, imageMatrix) {
@@ -170,12 +155,5 @@ function goDown(x, y, imageMatrix) {
     y += 1;
     pixel = imageMatrix[y][x]
   }
-
-  let instruction = directions[pixel.join(' ')];
-  if (instruction === 'turn-right') {
-    goLeft(x, y, imageMatrix);
-  }
-  else if (instruction === 'turn-left') {
-    goRight(x, y, imageMatrix);
-  }
+  directionChange(pixel, x, y, goRight, goLeft, imageMatrix)
 }

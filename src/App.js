@@ -1,258 +1,192 @@
 import React, { Component } from 'react';
-import logo from './logo.svg';
 import './App.css';
 import * as pngjs from 'pngjs';
 
 
 class App extends Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      imgString: ""
-    }
+  constructor() {
+    super()
     this.directions = {
       '7 84 19': 'go-up',
       '139 57 137': 'go-left',
       '51 69 169': 'stop',
       '182 149 72': 'turn-right',
       '123 131 154': 'turn-left'
-    };
+    }
+    this.canvas = []
+    this.bounds = {}
+  }
 
-    this.bounds = {};
+  _initCanvas(width, height) {
+    for (var i = 0; i < height; i++) {
+      var row = []
+      for (var j = 0; j < width; j++) {
+        row.push([255, 255, 255])
+      }
+      this.canvas.push(row)
+    }
+  }
+
+  _createPixels(rgbCodes) {
+    let pixels = []
+    for (var i = 0; i < rgbCodes.length; i += 4) {
+      pixels.push([rgbCodes[i], rgbCodes[i+1], rgbCodes[i+2]])
+    }
+    return pixels
+  }
+
+  _convertPixelsToImageMatrix(pixels, width, height) {
+    let imageMatrix = []
+    for (var i = 0; i < height; i++) {
+      let row = []
+      for (var j = 0; j < width; j++) {
+        let pad = i * width
+        let curPix = pixels[j + pad]
+        row.push(curPix)
+      }
+      imageMatrix.push(row)
+    } 
+    return imageMatrix
+  }
+
+  _listInstructions(mtx) {
+    let pxls = []
+    for (var i = 0; i < mtx.length; i++) {
+      for (var j = 0; j < mtx[i].length; j++) {
+        let dir = this.directions[mtx[i][j].join(' ')]
+        if (dir) pxls.push([i, j])
+      }
+    }
+    return pxls
+  }
+
+  _drawByControlpixels(imageMatrix) {
+    for (var rowIdx = 0; rowIdx < imageMatrix.length; rowIdx++) {
+      let row = imageMatrix[rowIdx]
+      for (var pixelIdx = 0; pixelIdx < row.length; pixelIdx++) {
+        let pixel = row[pixelIdx]
+        let instruction = this.directions[pixel.join(' ')]
+        if (instruction) {
+          switch (instruction) {
+            case 'go-up': this._goUp(pixelIdx, rowIdx, imageMatrix); break;
+            case 'go-left': this._goLeft(pixelIdx, rowIdx, imageMatrix); break;
+          }              
+        }
+      }
+    }
+  }
+
+  _paintHere(pixel) {
+    return !this.directions[pixel.join(' ')]
+  }
+
+  _directionChange(pixel, x, y, left, right, imageMatrix) {
+    switch (this.directions[pixel.join(' ')]) {
+      case 'turn-right': right(x, y, imageMatrix); break;
+      case 'turn-left': left(x, y, imageMatrix); break;
+    }
+  }
+
+  _goUp(x, y, imageMatrix) {
+    y -= 1
+    let pixel = imageMatrix[y][x]
+    while (this._paintHere(pixel) && y > 0) {
+      this.canvas[y][x] = [0,0,0]
+      y -= 1
+      pixel = imageMatrix[y][x]
+    }
+    this._directionChange(pixel, x, y, this._goLeft.bind(this), this._goRight.bind(this), imageMatrix)
+  }
+
+  _goLeft(x, y, imageMatrix) {
+    x -= 1
+    let pixel = imageMatrix[y][x]
+    while (this._paintHere(pixel) && x > 0) {
+      this.canvas[y][x] = [0,0,0]
+      x -= 1;
+      pixel = imageMatrix[y][x]
+    }
+    this._directionChange(pixel, x, y, this._goDown.bind(this), this._goUp.bind(this), imageMatrix)
+  }
+
+  _goRight(x, y, imageMatrix) {
+    x += 1
+    let pixel = imageMatrix[y][x]
+    while (this._paintHere(pixel) && x <= this.bounds.x) {
+      this.canvas[y][x] = [0,0,0]
+      x += 1
+      pixel = imageMatrix[y][x]
+    }
+    this._directionChange(pixel, x, y, this._goUp.bind(this), this._goDown.bind(this), imageMatrix)
+  }
+
+  _goDown(x, y, imageMatrix) {
+    y += 1
+    let pixel = imageMatrix[y][x]
+    while (this._paintHere(pixel) && y < this.bounds.y) {
+      this.canvas[y][x] = [0,0,0]
+      y += 1;
+      pixel = imageMatrix[y][x]
+    }
+    this._directionChange(pixel, x, y, this._goRight.bind(this), this._goLeft.bind(this), imageMatrix)
+  }
+  
+  _printMtx(m) {
+    let answ = ""
+    let answLines = [];
+    for (var i = 0; i < m.length; i++) {
+      let str = ""
+      for (var j = 0; j < m[i].length; j++) {
+        m[i][j].join(' ') === '255 255 255' ? str += ' ' : str += 'X'
+      }
+      answ += (str + "\n")
+      answLines.push(str)
+    }
+
+    /* Ugly hack because this has taken enough time already */
+    document.getElementById('img-input').remove()
+    let line = document.createElement('pre')
+    line.appendChild(document.createTextNode(answ))
+    document.getElementById('answ').appendChild(line)
+  }
+
+  _fillInControlPixels(controlPixels) {
+    controlPixels.forEach((cp) => {
+      this.canvas[cp[0]][cp[1]] = [0,0,0]
+    });
   }
 
   handleFile(fileChooseEvent) {
-    let file = fileChooseEvent.target.files[0];
-    let fr = new FileReader();
+    let file = fileChooseEvent.target.files[0]
+    let fr = new FileReader()
 
     fr.onload = (fileReadEvent) => {
-      let bytes = new Uint8Array(fileReadEvent.target.result);
-      let PNG = pngjs.PNG;
+      let bytes = new Uint8Array(fileReadEvent.target.result)
+      let PNG = pngjs.PNG
       let pngHandler = new PNG().parse(bytes, (err, parseResult) => {
-        this.bounds.x = parseResult.width;
-        this.bounds.y = parseResult.height;
-        let rgbCodes = parseResult.data;
-        console.log(rgbCodes)
-        let pixels = [];
-        for (var i = 0; i < rgbCodes.length; i += 4) {
-          pixels.push([rgbCodes[i], rgbCodes[i+1], rgbCodes[i+2]]);
-        }
-
-        let imageMatrix = [];
-        for (var i = 0; i < parseResult.height; i++) {
-          let row = [];
-          for (var j = 0; j < parseResult.width; j++) {
-            let pad = i * parseResult.width;
-            let curPix = pixels[j + pad];
-            row.push(curPix);
-          }
-          imageMatrix.push(row); 
-        }
-
-
-
-        for (var rowIdx = 0; rowIdx < imageMatrix.length; rowIdx++) {
-          let row = imageMatrix[rowIdx];
-          for (var pixelIdx = 0; pixelIdx < row.length; pixelIdx++) {
-            let pixel = row[pixelIdx];
-            let instruction = this.directions[pixel.join(' ')];
-            if (instruction) {
-              // console.log(`Handling instruction at ${pixelIdx}, ${rowIdx}`)
-              // console.log(instruction);
-              switch (instruction) {
-                case 'go-up': this.goUp(pixelIdx, rowIdx, imageMatrix);
-                case 'go-left': this.goLeft(pixelIdx, rowIdx, imageMatrix);
-              }              
-            }
-          }          
-        }
-
-      //   console.log('hooha');
-        
-        let newPixels = imageMatrix.reduce((acc, row) => {
-          let rowPixels = row.reduce((rAcc, pixel) => {
-            return rAcc.concat(pixel.concat([255]));
-          }, []);
-          return acc.concat(rowPixels);
-        }, []);
-
-        
-        let newPng = new PNG({width: 180, height: 60})
-        newPng.data = newPixels
-        console.log(pd)
-        var pd = PNG.sync.read(newPng.data)
-        console.log(pd)
-        console.log(newPng.pack(newPixels, 180, 60))
-        let base64String = btoa(String.fromCharCode(...newPng.data));
-        this.setState({
-          imgString: 'data:image/png;base64,'+base64String
-        })
+        this.bounds.x = parseResult.width
+        this.bounds.y = parseResult.height
+        const rgbCodes = parseResult.data
+        const pixels = this._createPixels(rgbCodes)
+        const imageMatrix = this._convertPixelsToImageMatrix(pixels, this.bounds.x, this.bounds.y)
+        const controlPixels = this._listInstructions(imageMatrix)
+        this._initCanvas(this.bounds.x, this.bounds.y)
+        this._drawByControlpixels(imageMatrix)
+        this._fillInControlPixels(controlPixels)
+        this._printMtx(this.canvas)
       });
     }
 
-    fr.readAsArrayBuffer(file);
-
-  }
-
-  goUp(x, y, imageMatrix) {
-    console.log(`Got cordinates ${x} and ${y}, going up`);
-    let pixel = imageMatrix[y][x]
-    do {
-      imageMatrix[y][x] = [0,0,0]
-      y -= 1;
-      pixel = imageMatrix[y][x]
-    } while (!this.directions[pixel.join(' ')] && y > 0);
-
-    let instruction = this.directions[pixel.join(' ')];
-    if (instruction === 'stop') return;
-    if (instruction === 'turn-right') {
-      this.goRight(x, y, imageMatrix);
-    }
-    if (instruction === 'turn-left') {
-      this.goLeft(x, y, imageMatrix);
-    }
-  }
-
-  goLeft(x, y, imageMatrix) {
-    console.log(`Got cordinates ${x} and ${y}, going left`);
-
-    let pixel = imageMatrix[y][x]
-    do {
-      imageMatrix[y][x] = [0,0,0]
-      x -= 1;
-      pixel = imageMatrix[y][x]
-    } while (!this.directions[pixel.join(' ')] && x > 0);
-
-    let instruction = this.directions[pixel.join(' ')];
-    if (instruction === 'stop') return;
-    if (instruction === 'turn-right') {
-      this.goUp(x, y, imageMatrix);
-    }
-    if (instruction === 'turn-left') {
-      this.goDown(x, y, imageMatrix);
-    }
-  }
-
-  goRight(x, y, imageMatrix) {
-    console.log(`Got cordinates ${x} and ${y}, going right`);
-    let pixel = imageMatrix[y][x]
-    do {
-      imageMatrix[y][x] = [0,0,0]
-      x += 1;
-      pixel = imageMatrix[y][x]
-    } while (!this.directions[pixel.join(' ')] && x < this.bounds.x);
-
-    let instruction = this.directions[pixel.join(' ')];
-    if (instruction === 'stop') return;
-    if (instruction === 'turn-right') {
-      this.goDown(x, y, imageMatrix);
-    }
-    if (instruction === 'turn-left') {
-      this.goUp(x, y, imageMatrix);
-    }
-  }
-
-  goDown(x, y, imageMatrix) {
-    console.log(`Got cordinates ${x} and ${y}, going down`);
-    let pixel = imageMatrix[y][x]
-    do {
-      imageMatrix[y][x] = [0,0,0]
-      y += 1;
-      pixel = imageMatrix[y][x]
-    } while (!this.directions[pixel.join(' ')] && y > this.bounds.y);
-
-    let instruction = this.directions[pixel.join(' ')];
-    if (instruction === 'stop') return;
-    if (instruction === 'turn-right') {
-      this.goLeft(x, y, imageMatrix);
-    }
-    if (instruction === 'turn-left') {
-      this.goRight(x, y, imageMatrix);
-    }
-  }
-
-  drawLineReduceAxis(rowIdx, pixelIdx, axis, imageMatrix) {
-    imageMatrix[rowIdx][pixelIdx] = [0, 0, 0];
-    let pixel = imageMatrix[rowIdx][pixelIdx];
-
-    if (axis === 'y') {
-      rowIdx -= 1;
-      while (!this.directions[pixel.join(' ')]) {
-        imageMatrix[rowIdx][pixelIdx] = [0, 0, 0];
-      }
-    } else {
-      pixelIdx -= 1;
-      while (!this.directions[pixel.join(' ')]) {
-        imageMatrix[rowIdx][pixelIdx] = [0, 0, 0];
-      }
-    }
-
-    let instruction = this.directions[pixel.join(' ')];
-    switch (instruction) {
-      case 'turn-right': (() => {
-        switch (axis) {
-          case 'y': this.drawLineIncreaseAxis(rowIdx, pixelIdx, 'x', imageMatrix);
-          case 'x': this.drawLineReduceAxis(rowIdx, pixelIdx, 'y', imageMatrix);
-        }
-      }).call(this);
-
-      case 'turn-left': (() => {
-        if (axis === 'y') {
-          this.drawLineReduceAxis(rowIdx, pixelIdx, 'x', imageMatrix);
-        } else {
-          this.drawLineIncreaseAxis(rowIdx, pixelIdx, 'y', imageMatrix);
-        }
-      }).call(this);
-    }      
-  }
-
-  drawLineIncreaseAxis(rowIdx, pixelIdx, axis, imageMatrix) {
-    imageMatrix[rowIdx][pixelIdx] = [0, 0, 0];
-    let pixel = imageMatrix[rowIdx][pixelIdx];
-
-    if (axis === 'y') {
-      rowIdx += 1;
-      while (!this.directions[pixel.join(' ')]) {
-        imageMatrix[rowIdx][pixelIdx] = [0, 0, 0];
-      }
-    } else {
-      pixelIdx += 1;
-      while (!this.directions[pixel.join(' ')]) {
-        imageMatrix[rowIdx][pixelIdx] = [0, 0, 0];
-      }
-    }
-
-    let instruction = this.directions[pixel.join(' ')];
-    switch (instruction) {
-      case 'turn-right': (() => {
-        switch (axis) {
-          case 'y': this.drawLineReduceAxis(rowIdx, pixelIdx, 'x', imageMatrix);
-          case 'x': this.drawLineIncreaseAxis(rowIdx, pixelIdx, 'y', imageMatrix);
-        }
-      }).call(this);
-
-      case 'turn-left': (() => {
-        if (axis === 'y') {
-          this.drawLineIncreaseAxis(rowIdx, pixelIdx, 'x', imageMatrix);
-        } else {
-          this.drawLineReduceAxis(rowIdx, pixelIdx, 'y', imageMatrix);
-        }
-      }).call(this);
-    }      
+    fr.readAsArrayBuffer(file)
   }
 
   render() {
     return (
       <div className="App">
-        <div className="App-header">
-          <img src={logo} className="App-logo" alt="logo" />
-          <h2>Welcome to React</h2>
-        </div>
+        <h1>Wundernut 2016 decrypter</h1>
         <br />
-        <input type="file" name="png-input" onChange={this.handleFile.bind(this)} />
-        <div>
-          <img id="dec" src={this.state.imgString} />
-        </div>
+        <input type="file" id="img-input" onChange={this.handleFile.bind(this)} />
+        <div id="answ"></div>
       </div>
     );
   }
