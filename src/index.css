@@ -8,7 +8,6 @@ body {
 	background-image: url(/css/images/logo.png);
 	background-repeat: no-repeat;
 	background-position: left top;
-	padding-top:95px;
 	margin-bottom:60px;
 	-webkit-animation-duration: 5s;
 	animation-duration: 5s;
@@ -29,4 +28,12 @@ body {
 .fadeIn {
 	-webkit-animation-name: fadeIn;
 	animation-name: fadeIn;
+}
+
+pre {
+	padding: 0;
+}
+
+h1 {
+	margin-bottom: 0;
 }
