@@ -68,8 +68,8 @@ class App extends Component {
         let instruction = this.directions[pixel.join(' ')]
         if (instruction) {
           switch (instruction) {
-            case 'go-up': this._goUp(pixelIdx, rowIdx, imageMatrix); break;
-            case 'go-left': this._goLeft(pixelIdx, rowIdx, imageMatrix); break;
+            case 'go-up': this._drawLine('up', {x: pixelIdx, y: rowIdx}, this._moveFn('up'), imageMatrix); break;
+            case 'go-left': this._drawLine('left', {x: pixelIdx, y: rowIdx}, this._moveFn('left'), imageMatrix); break;
             default: break;
           }              
         }
@@ -81,61 +81,46 @@ class App extends Component {
     return !this.directions[pixel.join(' ')]
   }
 
-  _directionChange(pixel, x, y, left, right, imageMatrix) {
+  _moveFn(dir) {
+    switch (dir) {
+      case 'left': return (coords) => { coords.x -= 1 }
+      case 'right': return (coords) => { coords.x += 1 }
+      case 'up': return (coords) => { coords.y -= 1 }
+      case 'down': return (coords) => { coords.y += 1 }
+      default: return () => {}
+    }
+  }
+
+  _directionChange(pixel, coords, left, right, imageMatrix) {
+    let leftFn = this._moveFn(left)
+    let rightFn = this._moveFn(right)
     switch (this.directions[pixel.join(' ')]) {
-      case 'turn-right': right(x, y, imageMatrix); break;
-      case 'turn-left': left(x, y, imageMatrix); break;
+      case 'turn-right': this._drawLine(right, coords, rightFn, imageMatrix); break;
+      case 'turn-left': this._drawLine(left, coords, leftFn, imageMatrix); break;
       default: break;
     }
   }
 
-  _goUp(x, y, imageMatrix) {
-    y -= 1
-    let pixel = imageMatrix[y][x]
-    while (this._paintHere(pixel) && y > 0) {
-      this.canvas[y][x] = [0,0,0]
-      y -= 1
-      pixel = imageMatrix[y][x]
+  _drawLine(dir, coords, move, imageMatrix) {
+    move(coords)
+    let pixel = imageMatrix[coords.y][coords.x]
+    while (this._paintHere(pixel)) {
+      this.canvas[coords.y][coords.x] = [0,0,0]
+      move(coords)
+      pixel = imageMatrix[coords.y][coords.x]
     }
-    this._directionChange(pixel, x, y, this._goLeft.bind(this), this._goRight.bind(this), imageMatrix)
-  }
-
-  _goLeft(x, y, imageMatrix) {
-    x -= 1
-    let pixel = imageMatrix[y][x]
-    while (this._paintHere(pixel) && x > 0) {
-      this.canvas[y][x] = [0,0,0]
-      x -= 1;
-      pixel = imageMatrix[y][x]
+    switch (dir) {
+      case 'up': this._directionChange(pixel, coords, 'left', 'right', imageMatrix); break;
+      case 'down': this._directionChange(pixel, coords, 'right', 'left', imageMatrix); break;
+      case 'left': this._directionChange(pixel, coords, 'down', 'up', imageMatrix); break;
+      case 'right': this._directionChange(pixel, coords, 'up', 'down', imageMatrix); break;
+      default: break;
     }
-    this._directionChange(pixel, x, y, this._goDown.bind(this), this._goUp.bind(this), imageMatrix)
-  }
-
-  _goRight(x, y, imageMatrix) {
-    x += 1
-    let pixel = imageMatrix[y][x]
-    while (this._paintHere(pixel) && x <= this.bounds.x) {
-      this.canvas[y][x] = [0,0,0]
-      x += 1
-      pixel = imageMatrix[y][x]
-    }
-    this._directionChange(pixel, x, y, this._goUp.bind(this), this._goDown.bind(this), imageMatrix)
-  }
-
-  _goDown(x, y, imageMatrix) {
-    y += 1
-    let pixel = imageMatrix[y][x]
-    while (this._paintHere(pixel) && y < this.bounds.y) {
-      this.canvas[y][x] = [0,0,0]
-      y += 1;
-      pixel = imageMatrix[y][x]
-    }
-    this._directionChange(pixel, x, y, this._goRight.bind(this), this._goLeft.bind(this), imageMatrix)
   }
   
   _printMtx(m) {
     let answ = ""
-    let answLines = [];
+    let answLines = []
     for (var i = 0; i < m.length; i++) {
       let str = ""
       for (var j = 0; j < m[i].length; j++) {
@@ -156,7 +141,7 @@ class App extends Component {
   _fillInControlPixels(controlPixels) {
     controlPixels.forEach((cp) => {
       this.canvas[cp[0]][cp[1]] = [0,0,0]
-    });
+    })
   }
 
   handleFile(acceptedFiles, rejectedFiles) {
@@ -178,7 +163,7 @@ class App extends Component {
         this._drawByControlpixels(imageMatrix)
         this._fillInControlPixels(controlPixels)
         this._printMtx(this.canvas)
-      });
+      })
     }
 
     fr.readAsArrayBuffer(file)
@@ -204,8 +189,8 @@ class App extends Component {
         
         <div id="answ"></div>
       </div>
-    );
+    )
   }
 }
 
-export default App;
+export default App
