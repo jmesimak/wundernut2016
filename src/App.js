@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import './App.css';
 import * as pngjs from 'pngjs';
 import Dropzone from 'react-dropzone';
+import { chunk } from 'lodash';
 
 class App extends Component {
   constructor() {
@@ -18,63 +19,31 @@ class App extends Component {
   }
 
   _initCanvas(width, height) {
-    for (var i = 0; i < height; i++) {
-      var row = []
-      for (var j = 0; j < width; j++) {
-        row.push([255, 255, 255])
-      }
-      this.canvas.push(row)
-    }
+    this.canvas = Array(height).fill().map(() => Array(width).fill([255, 255, 255]))
   }
 
   _createPixels(rgbCodes) {
-    let pixels = []
-    for (var i = 0; i < rgbCodes.length; i += 4) {
-      pixels.push([rgbCodes[i], rgbCodes[i+1], rgbCodes[i+2]])
-    }
-    return pixels
+    return chunk(rgbCodes, 4).map((pixel) => pixel.slice(0, pixel.length - 1))
   }
 
   _convertPixelsToImageMatrix(pixels, width, height) {
-    let imageMatrix = []
-    for (var i = 0; i < height; i++) {
-      let row = []
-      for (var j = 0; j < width; j++) {
-        let pad = i * width
-        let curPix = pixels[j + pad]
-        row.push(curPix)
-      }
-      imageMatrix.push(row)
-    } 
-    return imageMatrix
+    return chunk(pixels, width)
   }
 
-  _listInstructions(mtx) {
-    let pxls = []
-    for (var i = 0; i < mtx.length; i++) {
-      for (var j = 0; j < mtx[i].length; j++) {
-        let dir = this.directions[mtx[i][j].join(' ')]
-        if (dir) pxls.push([i, j])
-      }
-    }
-    return pxls
+  _isDirection(pixel) {
+    return !!this.directions[pixel.join(' ')]
   }
 
   _drawByControlpixels(imageMatrix) {
-    for (var rowIdx = 0; rowIdx < imageMatrix.length; rowIdx++) {
-      let row = imageMatrix[rowIdx]
-      for (var pixelIdx = 0; pixelIdx < row.length; pixelIdx++) {
-        let pixel = row[pixelIdx]
-        let instruction = this.directions[pixel.join(' ')]
-        if (instruction) {
-          switch (instruction) {
-            case 'go-up': this._drawLine('up', {x: pixelIdx, y: rowIdx}, this._moveFn('up'), imageMatrix); break;
-            case 'go-left': this._drawLine('left', {x: pixelIdx, y: rowIdx}, this._moveFn('left'), imageMatrix); break;
-            default: break;
-          }              
-        }
-      }
-    }
+    imageMatrix.forEach((row, rowIdx) => {
+      row.forEach((pixel, pixelIdx) => {
+        switch (this.directions[pixel.join(' ')]) {
+          case 'go-up': this._drawLine('up', {x: pixelIdx, y: rowIdx}, this._moveFn('up'), imageMatrix); break;
+          case 'go-left': this._drawLine('left', {x: pixelIdx, y: rowIdx}, this._moveFn('left'), imageMatrix); break;
+          default: break;
+        }              
+      })
+    })
   }
 
   _paintHere(pixel) {
@@ -119,16 +88,11 @@ class App extends Component {
   }
   
   _printMtx(m) {
-    let answ = ""
-    let answLines = []
-    for (var i = 0; i < m.length; i++) {
-      let str = ""
-      for (var j = 0; j < m[i].length; j++) {
-        m[i][j].join(' ') === '255 255 255' ? str += ' ' : str += 'X'
-      }
-      answ += (str + "\n")
-      answLines.push(str)
-    }
+    let answ = m.map((row) => 
+      row.map((pixel) => 
+        pixel.join(' ') === '255 255 255' ? ' ' : 'X')
+      .join(''))
+    .join('\n')
 
     /* Ugly hack because this has taken enough time already */
     document.getElementById('dropzone').remove()
@@ -138,14 +102,15 @@ class App extends Component {
     document.getElementById('answ').appendChild(line)
   }
 
-  _fillInControlPixels(controlPixels) {
-    controlPixels.forEach((cp) => {
-      this.canvas[cp[0]][cp[1]] = [0,0,0]
+  _fillInControlPixels(imageMatrix) {
+    imageMatrix.forEach((row, rowIdx) => {
+      row.forEach((pixel, pixelIdx) => {
+        if (this._isDirection(pixel)) this.canvas[rowIdx][pixelIdx] = [0,0,0]
+      })
     })
   }
 
   handleFile(acceptedFiles, rejectedFiles) {
-    console.log(acceptedFiles)
     let file = acceptedFiles[0]
     let fr = new FileReader()
 
@@ -158,10 +123,9 @@ class App extends Component {
         const rgbCodes = parseResult.data
         const pixels = this._createPixels(rgbCodes)
         const imageMatrix = this._convertPixelsToImageMatrix(pixels, this.bounds.x, this.bounds.y)
-        const controlPixels = this._listInstructions(imageMatrix)
         this._initCanvas(this.bounds.x, this.bounds.y)
         this._drawByControlpixels(imageMatrix)
-        this._fillInControlPixels(controlPixels)
+        this._fillInControlPixels(imageMatrix)
         this._printMtx(this.canvas)
       })
     }
