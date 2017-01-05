@@ -15,7 +15,6 @@ class App extends Component {
       '123 131 154': 'turn-left'
     }
     this.canvas = []
-    this.bounds = {}
   }
 
   _initCanvas(width, height) {
@@ -51,13 +50,12 @@ class App extends Component {
   }
 
   _moveFn(dir) {
-    switch (dir) {
-      case 'left': return (coords) => { coords.x -= 1 }
-      case 'right': return (coords) => { coords.x += 1 }
-      case 'up': return (coords) => { coords.y -= 1 }
-      case 'down': return (coords) => { coords.y += 1 }
-      default: return () => {}
-    }
+    return {
+      left: (coords) => { coords.x -= 1 },
+      right: (coords) => { coords.x += 1 },
+      up: (coords) => { coords.y -= 1 },
+      down: (coords) => { coords.y += 1 }
+    }[dir]
   }
 
   _directionChange(pixel, coords, left, right, imageMatrix) {
@@ -86,7 +84,7 @@ class App extends Component {
       default: break;
     }
   }
-  
+
   _printMtx(m) {
     let answ = m.map((row) => 
       row.map((pixel) => 
@@ -115,21 +113,16 @@ class App extends Component {
     let fr = new FileReader()
 
     fr.onload = (fileReadEvent) => {
-      let bytes = new Uint8Array(fileReadEvent.target.result)
-      let PNG = pngjs.PNG
-      new PNG().parse(bytes, (err, parseResult) => {
-        this.bounds.x = parseResult.width
-        this.bounds.y = parseResult.height
-        const rgbCodes = parseResult.data
-        const pixels = this._createPixels(rgbCodes)
-        const imageMatrix = this._convertPixelsToImageMatrix(pixels, this.bounds.x, this.bounds.y)
-        this._initCanvas(this.bounds.x, this.bounds.y)
+      const bytes = new Uint8Array(fileReadEvent.target.result)
+      new pngjs.PNG().parse(bytes, (err, parseResult) => {
+        const pixels = this._createPixels(parseResult.data)
+        const imageMatrix = this._convertPixelsToImageMatrix(pixels, parseResult.width, parseResult.height)
+        this._initCanvas(parseResult.width, parseResult.height)
         this._drawByControlpixels(imageMatrix)
         this._fillInControlPixels(imageMatrix)
         this._printMtx(this.canvas)
       })
     }
-
     fr.readAsArrayBuffer(file)
   }
 
